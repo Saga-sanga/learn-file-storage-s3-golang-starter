@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,13 +52,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	fileExtension := strings.Split(mediaType, "/")[1]
 
-	imageData, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Unable to read image data", err)
-		return
-	}
-
-	encodedImage := base64.StdEncoding.EncodeToString(imageData)
 	thumbnailFilePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoIDString, fileExtension))
 	thumbnailFile, err := os.Create(thumbnailFilePath)
 	if err != nil {
@@ -69,13 +61,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	defer thumbnailFile.Close()
 	fmt.Printf("%s created on path %s \n", thumbnailFilePath, thumbnailFile.Name())
 
-	// written, err := io.Copy(thumbnailFile, file)
-	written, err := thumbnailFile.Write(imageData)
+	written, err := io.Copy(thumbnailFile, file)
+	// written, err := thumbnailFile.Write(imageData)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to write to file", err)
 		return
 	}
-	fmt.Printf("Wrote: %v", written)
+	fmt.Printf("Wrote: %v\n", written)
 
 	videoMetaData, err := cfg.db.GetVideo(videoID)
 	if userID != videoMetaData.UserID {
@@ -83,7 +75,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	newThumbnailUrl := fmt.Sprintf("data:%s;base64,%s", mediaType, encodedImage)
+	newThumbnailUrl := fmt.Sprintf("http://localhost:%s/%s", cfg.port, thumbnailFilePath)
 	videoMetaData.ThumbnailURL = &newThumbnailUrl
 
 	err = cfg.db.UpdateVideo(videoMetaData)
