@@ -50,24 +50,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fileExtension := strings.Split(mediaType, "/")[1]
+	assetPath := getAssetPath(videoID, mediaType)
+	assetDiskPath := cfg.getAssetDiskPath(assetPath)
 
-	thumbnailFilePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoIDString, fileExtension))
-	thumbnailFile, err := os.Create(thumbnailFilePath)
+	thumbnailFile, err := os.Create(assetDiskPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to create file", err)
 		return
 	}
 	defer thumbnailFile.Close()
-	fmt.Printf("%s created on path %s \n", thumbnailFilePath, thumbnailFile.Name())
 
-	written, err := io.Copy(thumbnailFile, file)
-	// written, err := thumbnailFile.Write(imageData)
-	if err != nil {
+	if _, err = io.Copy(thumbnailFile, file); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to write to file", err)
 		return
 	}
-	fmt.Printf("Wrote: %v\n", written)
 
 	videoMetaData, err := cfg.db.GetVideo(videoID)
 	if userID != videoMetaData.UserID {
@@ -75,7 +71,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	newThumbnailUrl := fmt.Sprintf("http://localhost:%s/%s", cfg.port, thumbnailFilePath)
+	newThumbnailUrl := cfg.getAssetURL(assetPath)
 	videoMetaData.ThumbnailURL = &newThumbnailUrl
 
 	err = cfg.db.UpdateVideo(videoMetaData)
