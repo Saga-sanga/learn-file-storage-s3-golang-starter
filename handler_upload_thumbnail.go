@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -48,6 +51,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	fileExtension := strings.Split(mediaType, "/")[1]
+
 	imageData, err := io.ReadAll(file)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to read image data", err)
@@ -55,6 +60,22 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	encodedImage := base64.StdEncoding.EncodeToString(imageData)
+	thumbnailFilePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoIDString, fileExtension))
+	thumbnailFile, err := os.Create(thumbnailFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to create file", err)
+		return
+	}
+	defer thumbnailFile.Close()
+	fmt.Printf("%s created on path %s \n", thumbnailFilePath, thumbnailFile.Name())
+
+	// written, err := io.Copy(thumbnailFile, file)
+	written, err := thumbnailFile.Write(imageData)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to write to file", err)
+		return
+	}
+	fmt.Printf("Wrote: %v", written)
 
 	videoMetaData, err := cfg.db.GetVideo(videoID)
 	if userID != videoMetaData.UserID {
